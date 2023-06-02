@@ -3,10 +3,11 @@
 namespace App\Http\Controllers\API;
 
 use Illuminate\Http\Request;
-use App\Models\User;
 use App\Http\Repositories\UserRepository;
 use App\Http\Requests\RegisterRequest;
+use App\Mail\WelcomeMail;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Mail;
 
 class UserController extends BaseController
 {
@@ -23,18 +24,43 @@ class UserController extends BaseController
     public function register(RegisterRequest $request)
     {
         try {
+
+            $name = $request->name;
+            $email = $request->email;
+            $password = bcrypt($request->password);
+
             $data = [
-                'name' => $request->name,
-                'email' => $request->email,
-                'password' => bcrypt($request->password)
+                'name' => $name,
+                'email' => $email,
+                'password' => $password
             ];
 
             $user = $this->userRepository->create($data);
 
-            if($user) {
+            if($user != null) {
+
+                $email_token = rand(111111,999999);
+
+                $data = [
+                    'email_token' => $email_token,
+                ];
+
+                $this->userRepository->updateUser($email, $data);
+
+                $app_name  = config('externalapi.app_name');
+
+                // send welcome email
+                $mailData = [
+                    'name' => $name,
+                    'email_token' => $email_token,
+                    'app_name' => $app_name,
+                ];
+
+                Mail::to($email)->send(new WelcomeMail($mailData));
+
                 return $this->sendResponse($user, 'Registration successful.');
             } else {
-                return $this->sendError('Unable to create user. Please try again');
+                return $this->sendError('Registration failed. Please try again.', $data = []);
             }
         } catch (\Exception $e) {
             return $this->sendError('Oops! Something went wrong '.$e->getMessage());
