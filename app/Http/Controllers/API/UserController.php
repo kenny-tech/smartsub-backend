@@ -4,6 +4,7 @@ namespace App\Http\Controllers\API;
 
 use Illuminate\Http\Request;
 use App\Http\Repositories\UserRepository;
+use App\Http\Requests\LoginRequest;
 use App\Http\Requests\RegisterRequest;
 use App\Mail\WelcomeMail;
 use Illuminate\Support\Facades\Auth;
@@ -70,7 +71,7 @@ class UserController extends BaseController
     /**
      * Login
      */
-    public function login(Request $request)
+    public function login(LoginRequest $request)
     {
         try {
             if(Auth::attempt(['email' => $request->email, 'password' => $request->password, 'active' => true])){
@@ -89,4 +90,30 @@ class UserController extends BaseController
             return $this->sendError('Oops! Something went wrong '.$e->getMessage());
         }
     }
+
+    public function activateAccount(Request $request)
+    {
+        try {
+
+            $email_token = $request->email_token;
+
+            // verify email token
+            $user = $this->userRepository->verifyUserToken($email_token);
+
+            if(!$user) {
+                return $this->sendError('Invalid token supplied');
+            } else {
+                $email = $user->email;
+                $activate_account = $this->userRepository->activateAccount($email);;
+                if($activate_account) {
+                    return $this->sendResponse($user, 'Account successfully activated. Please login.');
+                } else {
+                    return $this->sendError('Unable to activate account. Please try again.', $data = []);
+                }
+            }
+        } catch (\Exception $e) {
+            return $this->sendError('Oops! Something went wrong '.$e->getMessage());
+        }
+    }
+
 }
